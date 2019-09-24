@@ -1,0 +1,44 @@
+type Person {
+    name: String!
+    interests: [Topic] @relation(name: "INTERESTED_IN", direction: "OUT")
+    conversationPartner: [Person] @cypher(statement: "MATCH (this)-[:INTERESTED_IN]->(t:Topic)<-[:INTERESTED_IN]-(p:Person) RETURN DISTINCT p")
+}
+
+type Topic {
+    name: String!
+    interestingTo: [Person] @relation(name: "INTERESTED_IN", direction: "IN")
+    inCommonWith: [Topic] @cypher(statement: "MATCH (this)<-[:INTERESTED_IN]-(:Person)-[:INTERESTED_IN]->(t:Topic) RETURN DISTINCT t")
+}
+
+
+type Query {
+    peopleBySubstring(substring:String!): [Person] @cypher(statement: "MATCH (p:Person) where p.name CONTAINS $substring RETURN p")
+	
+	sortedMembers(name:String=""): [Person] @cypher(statement: "MATCH (n:Person) RETURN n order by n.name")
+
+	notSelectedTopics(name:String): [Topic] @cypher(statement: "MATCH (n:Person)-[r:INTERESTED_IN]->(n1:Topic) where n.name = $name with collect(n1.name) as selectedTopics MATCH (n2:Topic) where not n2.name in selectedTopics RETURN distinct n2")
+
+	selectedTopics(name:String): [Topic] @cypher(statement: "MATCH (n:Person)-[]->(n1:Topic) where n.name=$name RETURN n1 order by n.name")
+	
+	notSelectedTopicsCount(name:String=""): [Topic] @cypher(statement: "MATCH (n:Person)-[r:INTERESTED_IN]->(n1:Topic) where n.name = $name with collect(n1.name) as selectedTopics MATCH (n2:Topic) where not n2.name in selectedTopics RETURN distinct n2")
+
+}
+type Mutation{
+	MergePerson(name:String): Person
+      @cypher(
+      statement: "Merge (n:Person{name:$name}) RETURN n"
+    )
+
+	MergeTopic(name:String): Topic
+      @cypher(
+      statement: "Merge (n:Topic{name:$name}) RETURN n"
+    )
+	AddUserTopic(from:String,to:String): Topic
+      @cypher(
+      statement: "Match(n:Person),(n1:Topic) where n.name=$from and n1.name=$to create (n)-[r:INTERESTED_IN]->(n1) RETURN n"
+    )
+	DeleteUserTopic(from:String,to:String): Topic
+      @cypher(
+      statement: "Match(n:Person)-[r:INTERESTED_IN]->(n1:Topic) where n.name=$from and n1.name=$to delete r RETURN n"
+    )
+}
